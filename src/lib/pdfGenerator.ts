@@ -1,59 +1,9 @@
 import { jsPDF } from 'jspdf';
 import { toJpeg } from 'html-to-image';
-
-// Matches the DriftResult interface in App.tsx
-interface DriftResult {
-  drift_score: number;
-  overall_score?: number;
-  alignment_status: string;
-  score_band?: string;
-  alert_classification?: string;
-  executive_summary: string;
-  chain_of_authority: string;
-  risk_areas: string[];
-  suggestions: string[];
-  changes: string[];
-  instrument_profile?: {
-    title: string;
-    type: string;
-    issuing_authority: string;
-    date: string;
-    enabling_provision: string;
-  };
-  parent_act?: {
-    name: string;
-    year: string;
-    delegation_clause: string;
-    relevant_sections: string[];
-  };
-  dimensions?: Record<string, { score: number; rationale: string; drift_indicators: string[] }>;
-  provision_mappings?: { instrument_provision: string; act_section: string; alignment: string; explanation: string }[];
-  precedent_citations?: { case_name: string; year: string; principle: string; applicability: string }[];
-  pdf_overview?: string;
-  pdf_statutory_authority?: string;
-  pdf_conclusion?: string;
-  citations?: { source: string; target: string }[];
-  timeline?: { date: string; event: string; drift_impact: string }[];
-}
-
-function getScoreColor(score: number): number[] {
-  if (score >= 90) return [19, 136, 8];
-  if (score >= 75) return [46, 139, 87];
-  if (score >= 50) return [255, 153, 51];
-  if (score >= 25) return [230, 81, 0];
-  return [211, 47, 47];
-}
-
-function getScoreBandLabel(score: number): string {
-  if (score >= 90) return 'Fully Conforming';
-  if (score >= 75) return 'Substantially Conforming';
-  if (score >= 50) return 'Marginal / Partially Drifting';
-  if (score >= 25) return 'Significantly Drifting';
-  return 'Ultra Vires';
-}
+import { UnifiedDriftResult } from '../types/analysis';
 
 export const generatePDFReport = async (
-  result: DriftResult,
+  result: UnifiedDriftResult,
   documentName: string | null,
   conversationId: string | null
 ) => {
@@ -63,15 +13,8 @@ export const generatePDFReport = async (
   const pageHeight = doc.internal.pageSize.getHeight();
   const contentWidth = pageWidth - 2 * margin;
   let yPos = margin;
-  const LH = 0.45;
 
-  const ensureSpace = (needed: number) => {
-    if (yPos + needed > pageHeight - margin) {
-      doc.addPage();
-      yPos = margin;
-    }
-  };
-
+  // Helper function to add text with wrapping and pagination
   const addText = (
     text: string,
     fontSize: number,
@@ -82,9 +25,15 @@ export const generatePDFReport = async (
     doc.setFontSize(fontSize);
     doc.setFont('helvetica', isBold ? 'bold' : 'normal');
     doc.setTextColor(color[0], color[1], color[2]);
+
     const lines = doc.splitTextToSize(text || '', contentWidth);
+
     for (let i = 0; i < lines.length; i++) {
-      ensureSpace(fontSize * LH + 2);
+      if (yPos > pageHeight - margin) {
+        doc.addPage();
+        yPos = margin;
+      }
+
       if (align === 'center') {
         doc.text(lines[i], pageWidth / 2, yPos, { align: 'center' });
       } else if (align === 'justify' && i < lines.length - 1) {
@@ -92,129 +41,114 @@ export const generatePDFReport = async (
       } else {
         doc.text(lines[i], margin, yPos);
       }
-      yPos += fontSize * LH;
+
+      yPos += fontSize * 0.4;
     }
   };
 
-  const addGap = (space: number) => { yPos += space; };
+  const addSpacing = (space: number) => {
+    yPos += space;
+    if (yPos > pageHeight - margin) {
+      doc.addPage();
+      yPos = margin;
+    }
+  };
 
-  const overall = result.overall_score ?? result.drift_score;
-  const scoreCol = getScoreColor(overall);
-  const band = getScoreBandLabel(overall);
-  const alert = result.alert_classification ?? (overall >= 75 ? 'GREEN' : overall >= 50 ? 'AMBER' : 'CRITICAL');
+  // === PAGE 1: NARRATIVE TEXT ===
 
-  // === COVER PAGE ===
-  addGap(30);
-  addText('VIDHI-VICHARA', 24, true, [255, 153, 51], 'center');
-  addGap(4);
-  addText('Executive Action Drift Analysis Report', 14, true, [44, 30, 22], 'center');
-  addGap(2);
-  addText('7-Dimension Statutory Conformance Framework v4.0', 10, false, [92, 78, 70], 'center');
-  addGap(16);
+  // Title
+  addText('Vidhi-Vichara | Legal AI Alignment Report', 14, true, [255, 153, 51], 'center');
+  addSpacing(8);
 
-  if (result.instrument_profile) {
-    addText(`Instrument: ${result.instrument_profile.title}`, 12, true, [44, 30, 22]);
-    addGap(2);
-    addText(`Type: ${result.instrument_profile.type.toUpperCase()} | Authority: ${result.instrument_profile.issuing_authority}`, 10, false, [92, 78, 70]);
-    addGap(8);
-  }
-  if (result.parent_act) {
-    addText(`Parent Act: ${result.parent_act.name} (${result.parent_act.year})`, 12, true, [44, 30, 22]);
-    addGap(12);
+  // Document Name
+  if (documentName) {
+    addText(`Document: ${documentName}`, 11, false, [0, 0, 0], 'center');
+    addSpacing(10);
   }
 
-  // Score box
-  ensureSpace(40);
-  doc.setFillColor(scoreCol[0], scoreCol[1], scoreCol[2]);
-  doc.roundedRect(margin, yPos, contentWidth, 28, 3, 3, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`OVERALL SCORE: ${overall}%`, pageWidth / 2, yPos + 12, { align: 'center' });
-  doc.setFontSize(10);
-  doc.text(`${band} | Alert: ${alert}`, pageWidth / 2, yPos + 21, { align: 'center' });
-  yPos += 34;
+  // Introduction
+  addText(
+    'Namaste! I am Vidhi-Vichara, an AI legal alignment assistant created by researchers at IIT Jodhpur. I have analyzed the provided Reserve Bank of India directive against its parent legislation to determine its legal alignment.',
+    10,
+    true,
+    [44, 30, 22],
+    'justify'
+  );
+  addSpacing(8);
 
-  addText(`Document: ${documentName || 'Analysis'}`, 10, false, [92, 78, 70], 'center');
-  addGap(3);
-  addText(`Generated by Vidhi-Vichara | IIT Jodhpur | ${new Date().toLocaleDateString('en-IN')}`, 9, false, [150, 150, 150], 'center');
+  // Statutory Authority and Alignment
+  addText('Statutory Authority and Alignment', 12, true, [255, 153, 51]);
+  addSpacing(4);
+  addText(
+    result.pdf_statutory_authority || "Information not available.",
+    10,
+    false,
+    [0, 0, 0],
+    'justify'
+  );
+  addSpacing(8);
 
-  // === EXECUTIVE SUMMARY ===
+  // Key Changes and Compliance
+  addText('Key Changes and Compliance', 12, true, [255, 153, 51]);
+  addSpacing(4);
+  addText(
+    result.pdf_overview || "Information not available.",
+    10,
+    false,
+    [0, 0, 0],
+    'justify'
+  );
+  addSpacing(8);
+
+  // Alignment Verdict
+  addText(
+    result.pdf_conclusion || "Information not available.",
+    10,
+    true,
+    [0, 0, 0],
+    'justify'
+  );
+  addSpacing(10);
+
+  // === PAGE 2: VISUALS ===
   doc.addPage();
   yPos = margin;
-  addText('EXECUTIVE SUMMARY', 16, true, [255, 153, 51]);
-  addGap(6);
-  addText(result.executive_summary || result.pdf_overview || 'No summary available.', 11, false, [44, 30, 22], 'justify');
-  addGap(12);
 
-  if (result.pdf_statutory_authority) {
-    addText('Statutory Authority', 14, true, [255, 153, 51]);
-    addGap(3);
-    addText(result.pdf_statutory_authority, 10, false, [60, 60, 60], 'justify');
-    addGap(12);
-  }
-
-  if (result.pdf_conclusion) {
-    addText(result.pdf_conclusion, 11, true, [44, 30, 22], 'justify');
-    addGap(12);
-  }
-
-  // === 7-DIMENSION ANALYSIS ===
-  if (result.dimensions) {
-    doc.addPage();
-    yPos = margin;
-    addText('7-DIMENSION ASSESSMENT', 16, true, [255, 153, 51]);
-    addGap(8);
-
-    const dimKeys = [
-      ['d1_delegation_scope', 'D1: Delegation Scope (20%)'],
-      ['d2_substantive_alignment', 'D2: Substantive Alignment (20%)'],
-      ['d3_procedural_mandate', 'D3: Procedural Mandate (15%)'],
-      ['d4_object_purpose', 'D4: Object & Purpose (15%)'],
-      ['d5_non_contravention', 'D5: Non-Contravention (15%)'],
-      ['d6_temporal_territorial', 'D6: Temporal/Territorial (5%)'],
-      ['d7_reasonableness', 'D7: Reasonableness (10%)'],
-    ];
-
-    dimKeys.forEach(([key, label]) => {
-      const dimData = result.dimensions![key];
-      if (!dimData) return;
-      const dColor = getScoreColor(dimData.score);
-      ensureSpace(24);
-      addText(`${label} — Score: ${dimData.score}/100 [${getScoreBandLabel(dimData.score)}]`, 10, true, dColor);
-      addGap(2);
-      addText(dimData.rationale || '', 9, false, [60, 60, 60], 'justify');
-      addGap(6);
-    });
-  }
-
-  // === DASHBOARD VISUALS ===
-  doc.addPage();
-  yPos = margin;
-  addText('VISUALIZATIONS', 16, true, [255, 153, 51]);
-  addGap(8);
-
-  const dashboardEl = document.querySelector('[data-analysis-dashboard]');
-  if (dashboardEl) {
+  // Try to capture visual charts from the dashboard
+  const dashboardElement = document.querySelector('[data-analysis-dashboard]');
+  if (dashboardElement) {
     try {
-      const dataUrl = await toJpeg(dashboardEl as HTMLElement, { quality: 0.9, pixelRatio: 2, backgroundColor: '#F4F1EA' });
-      const img = new Image();
-      img.src = dataUrl;
-      await new Promise(resolve => { img.onload = resolve; });
-      const imgHeight = (img.height * contentWidth) / img.width;
-      ensureSpace(imgHeight);
-      doc.addImage(dataUrl, 'JPEG', margin, yPos, contentWidth, imgHeight);
-      yPos += imgHeight + 12;
-    } catch (e) {
-      console.error('Failed to capture dashboard:', e);
+      const dataUrl = await toJpeg(dashboardElement as HTMLElement, { quality: 0.95 });
+      const imgWidth = contentWidth;
+      const imgHeight = (dashboardElement.clientHeight / dashboardElement.clientWidth) * contentWidth;
+      
+      if (yPos + imgHeight > pageHeight - margin) {
+        doc.addPage();
+        yPos = margin;
+      }
+      
+      doc.addImage(dataUrl, 'JPEG', margin, yPos, imgWidth, imgHeight);
+      yPos += imgHeight + 10;
+    } catch (error) {
+      console.error('Failed to capture dashboard image:', error);
     }
   }
 
   // === DISCLAIMER ===
-  ensureSpace(30);
-  addGap(8);
-  addText('This analysis is for informational purposes only and does not constitute legal advice. Only a competent court can definitively determine whether an instrument is ultra vires. Please consult a qualified legal professional for specific legal matters.', 9, false, [100, 100, 100], 'justify');
+  if (yPos > pageHeight - 40) {
+    doc.addPage();
+    yPos = margin;
+  }
 
+  addSpacing(10);
+  addText(
+    '⚖️ Disclaimer: This analysis is for informational purposes only and does not constitute legal advice. The assessment is based on computational analysis and should be verified by qualified legal professionals before being relied upon for any legal or regulatory decisions.',
+    9,
+    false,
+    [100, 100, 100]
+  );
+
+  // Save the PDF
   const fileName = conversationId
     ? `Vidhi-Vichara_${documentName || 'Analysis'}_${conversationId}.pdf`
     : `Vidhi-Vichara_${documentName || 'Analysis'}.pdf`;

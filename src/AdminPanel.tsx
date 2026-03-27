@@ -96,8 +96,8 @@ export default function AdminPanel() {
 
         // Chunk the text
         const allChunks = [];
-        const CHUNK_SIZE = 2000;
-        const OVERLAP = 300;
+        const CHUNK_SIZE = 1500;
+        const OVERLAP = 200;
         for (let i = 0; i < fullText.length; i += CHUNK_SIZE - OVERLAP) {
           allChunks.push({
             docName: fileName,
@@ -107,7 +107,7 @@ export default function AdminPanel() {
         }
 
         // Generate embeddings for chunks (batching them)
-        const BATCH_SIZE = 200;
+        const BATCH_SIZE = 100;
         for (let i = 0; i < allChunks.length; i += BATCH_SIZE) {
           const batch = allChunks.slice(i, i + BATCH_SIZE);
           const embeddings = await generateEmbeddings(batch.map(c => c.text));
@@ -176,7 +176,7 @@ export default function AdminPanel() {
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeTab === 'knowledgebase' ? 'bg-saffron text-navy font-semibold' : 'hover:bg-parchment-dark text-ink-light'}`}
             >
               <Database className="w-5 h-5" />
-              <TranslatedText text="Parent Acts / RAG" />
+              <TranslatedText text="Knowledgebase (RAG)" />
             </button>
             <button
               onClick={() => setActiveTab('users')}
@@ -234,10 +234,10 @@ export default function AdminPanel() {
             {activeTab === 'knowledgebase' && (
               <div>
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-semibold"><TranslatedText text="Parent Legislation Knowledge Base" /></h2>
+                  <h2 className="text-xl font-semibold"><TranslatedText text="Legal Knowledgebase" /></h2>
                   <label className="cursor-pointer bg-saffron text-navy px-4 py-2 rounded-lg font-semibold hover:bg-saffron-hover transition-colors flex items-center gap-2">
                     <Upload className="w-4 h-4" />
-                    {isUploading ? <TranslatedText text="Uploading..." /> : <TranslatedText text="Upload Parent Act / Legislation" />}
+                    {isUploading ? <TranslatedText text="Uploading..." /> : <TranslatedText text="Upload Document" />}
                     <input type="file" className="hidden" onChange={handleUploadKb} accept=".pdf,.txt" disabled={isUploading} />
                   </label>
                 </div>

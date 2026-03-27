@@ -36,76 +36,16 @@ interface Task {
   createdAt: any;
 }
 
-// 7-Dimension Drift Analysis Types (v4.0 Methodology)
-interface DimensionScore {
-  score: number;
-  rationale: string;
-  drift_indicators: string[];
-}
-
-interface ProvisionMapping {
-  instrument_provision: string;
-  act_section: string;
-  alignment: 'conforming' | 'exceeding' | 'narrowing' | 'contradicting' | 'not_traceable';
-  explanation: string;
-}
-
-interface PrecedentCitation {
-  case_name: string;
-  year: string;
-  principle: string;
-  applicability: string;
-}
-
-type ScoreBand = 'fully_conforming' | 'substantially_conforming' | 'marginal' | 'significantly_drifting' | 'ultra_vires';
-type AlertClassification = 'GREEN' | 'AMBER' | 'RED' | 'CRITICAL';
-
 interface DriftResult {
-  // Step 1: Contextualization
-  instrument_profile?: {
-    title: string;
-    type: 'rules' | 'regulations' | 'notification' | 'order' | 'circular' | 'scheme';
-    issuing_authority: string;
-    date: string;
-    gazette_reference?: string;
-    enabling_provision: string;
-  };
-  parent_act?: {
-    name: string;
-    year: string;
-    delegation_clause: string;
-    relevant_sections: string[];
-  };
-
-  // Step 2-3: Statutory Mapping & Alignment
-  provision_mappings?: ProvisionMapping[];
-
-  // Step 4: Precedent Review
-  precedent_citations?: PrecedentCitation[];
-
-  // Step 5: Integrity Assessment - 7 Dimensions
-  dimensions?: {
-    d1_delegation_scope: DimensionScore;
-    d2_substantive_alignment: DimensionScore;
-    d3_procedural_mandate: DimensionScore;
-    d4_object_purpose: DimensionScore;
-    d5_non_contravention: DimensionScore;
-    d6_temporal_territorial: DimensionScore;
-    d7_reasonableness: DimensionScore;
-  };
-
-  // Computed scores
-  overall_score?: number;
-  score_band?: ScoreBand;
-  alert_classification?: AlertClassification;
-
-  // Analysis narrative
+  drift_score: number;
+  alignment_status: string;
   executive_summary: string;
-  chain_of_authority: string;
+  changes: string[];
   risk_areas: string[];
   suggestions: string[];
-
-  // PDF-specific narrative sections
+  citations?: { source: string; target: string }[];
+  timeline?: { date: string; event: string; drift_impact: string }[];
+  chain_of_authority: string;
   pdf_overview?: string;
   pdf_statutory_authority?: string;
   pdf_conclusion?: string;
@@ -584,8 +524,8 @@ export default function App() {
 
         // Chunk the text
         const allChunks = [];
-        const CHUNK_SIZE = 2000;
-        const OVERLAP = 300;
+        const CHUNK_SIZE = 1500;
+        const OVERLAP = 200;
         for (let i = 0; i < fullText.length; i += CHUNK_SIZE - OVERLAP) {
           allChunks.push({
             docName: fileName,
@@ -1037,113 +977,41 @@ export default function App() {
         ragContext += `\n\n[Current Document Context]\n${docContext}\n`;
       }
 
-      const isAlignmentCheck = /align|drift|check|compare|evaluate|assess|verify|legal status|compliance|analysis|report|vires|conformance|delegation|statutory/i.test(text);
-
-      let systemPrompt = `You are Vidhi-Vichara (विधि-विचार), an AI legal alignment assistant created by researchers at IIT Jodhpur, India. You systematically evaluate whether executive instruments (rules, regulations, notifications, circulars, orders, schemes) operate within the boundaries set by their parent legislative Acts using the Vidhi-Vichara 7-Dimension Statutory Conformance Framework v4.0.
-
-CORE PREMISE: Parent Acts are presumed constitutionally valid (having survived legislative process, executive assent, and judicial review). The analytical question is whether subordinate executive instruments faithfully implement the legislative mandate without exceeding delegation, contravening the Act, or introducing unauthorized obligations.`;
+      const isAlignmentCheck = /align|drift|check|compare|evaluate|assess|verify|legal status|compliance|analysis|report/i.test(text);
+      
+      let systemPrompt = `You are Vidhi-Vichara (विधि-विचार), an AI legal alignment assistant created by researchers at IIT Jodhpur, India. Your purpose is to help users understand whether executive actions, statutory instruments, circulars, notifications, and directives are legally aligned with their parent legislation.`;
 
       if (isAlignmentCheck) {
         systemPrompt += `
-
-ANALYSIS MODE — 5-STEP ANALYTICAL PROTOCOL:
-
-STEP 1 — CONTEXTUALIZATION: Identify the executive instrument (type, issuing authority, date, gazette reference, enabling provision) and the parent Act (name, year, delegation clause, relevant sections).
-
-STEP 2 — STATUTORY MAPPING: Map each provision of the instrument against the relevant sections of the parent Act. For each, identify which Act section it implements and whether it falls within the delegation scope.
-
-STEP 3 — LEGISLATIVE ALIGNMENT ASSESSMENT: For each mapped provision, assess alignment: conforming, exceeding, narrowing, contradicting, or not_traceable to any Act provision.
-
-STEP 4 — PRECEDENT REVIEW: Identify judicial decisions interpreting the parent Act's delegation clause and relevant sections. Reference ultra vires case law.
-
-STEP 5 — INTEGRITY ASSESSMENT: Score the instrument on all 7 dimensions (0-100 each, rubric-anchored):
-
-D1 — DELEGATION SCOPE COMPLIANCE (Weight: 20%):
-Is each instrument provision traceable to the delegation clause?
-90-100: Every provision directly traceable. 75-89: All major provisions traceable, 1-2 minor require broad reading. 50-74: Substantive provisions not explicitly in clause, requires interpretive stretching. 25-49: Multiple provisions clearly exceed scope. 0-24: Instrument as whole outside Act's domain.
-
-D2 — SUBSTANTIVE ALIGNMENT (Weight: 20%):
-Are provisions consistent with the Act's definitions, thresholds, categories, timelines?
-90-100: Full consistency with all Act sections. 75-89: Minor definitional variations. 50-74: One or more provisions conflict with Act on reasonable reading. 25-49: Clear contradictions to Act provisions. 0-24: Systematic rewriting of Act standards.
-
-D3 — PROCEDURAL MANDATE ADHERENCE (Weight: 15%):
-Were laying, consultation, publication, and notice requirements followed?
-90-100: All procedural requirements verified as met. 75-89: Substantially compliant with minor informalities. 50-74: One mandatory procedure arguably not followed. 25-49: Clear non-compliance with required procedures. 0-24: Multiple mandatory procedures violated.
-
-D4 — OBJECT & PURPOSE FIDELITY (Weight: 15%):
-Does the instrument serve the Act's stated objects (Preamble, Statement of Objects)?
-90-100: Directly serves Act's purposes. 75-89: Serves primary purposes with minor ancillary extensions. 50-74: Connection to Act's purposes arguable. 25-49: Pursues objectives Act doesn't contemplate. 0-24: Used for extraneous purposes (colourable exercise).
-
-D5 — NON-CONTRAVENTION (Weight: 15%):
-Does the instrument avoid contradicting, modifying, or effectively amending the Act?
-90-100: No contradiction whatsoever. 75-89: Minor interpretive differences defensible. 50-74: One or more provisions arguably modify Act definitions/scope. 25-49: Instrument effectively amends Act provisions. 0-24: Systematic contradiction of Act's core provisions.
-
-D6 — TEMPORAL/TERRITORIAL COMPLIANCE (Weight: 5%):
-Does the instrument respect the Act's time and space boundaries?
-90-100: Fully within temporal/territorial scope. 75-89: Minor boundary questions. 50-74: Arguable overreach in time or territory. 25-49: Clear temporal or territorial excess. 0-24: Applied beyond Act's jurisdiction entirely.
-
-D7 — REASONABLENESS WITHIN STATUTORY BOUNDS (Weight: 10%):
-Is the instrument reasonable and non-arbitrary within the discretion granted?
-90-100: Clearly reasonable and proportionate. 75-89: Reasonable with minor proportionality questions. 50-74: Debatable proportionality or differential treatment. 25-49: Manifestly disproportionate or discriminatory. 0-24: Arbitrary with no rational connection to Act's objectives.
-
-OVERALL SCORE: Weighted mean of D1-D7 per weights above.
-
-SCORE BANDS:
-90-100 = Fully Conforming | 75-89 = Substantially Conforming | 50-74 = Marginal/Partially Drifting | 25-49 = Significantly Drifting | 0-24 = Ultra Vires
-
-ALERT CLASSIFICATION:
-GREEN: All dimensions > 75, no score below 50
-AMBER: Any dimension 50-74, OR negative trend
-RED: Any dimension < 50, OR 2+ dimensions in 50-74
-CRITICAL: Overall < 50, OR D1 < 40
-
-Respond with a clear narrative analysis, then embed a JSON block with the complete structured output. Use this exact JSON schema:
+ANALYSIS MODE: When a user asks you to check alignment between an executive action and a reference law, respond with structured JSON embedded in your response. Use this exact format:
 \`\`\`json
 {
-  "instrument_profile": { "title": "", "type": "rules|regulations|notification|order|circular|scheme", "issuing_authority": "", "date": "", "gazette_reference": "", "enabling_provision": "" },
-  "parent_act": { "name": "", "year": "", "delegation_clause": "", "relevant_sections": [] },
-  "provision_mappings": [{ "instrument_provision": "", "act_section": "", "alignment": "conforming|exceeding|narrowing|contradicting|not_traceable", "explanation": "" }],
-  "precedent_citations": [{ "case_name": "", "year": "", "principle": "", "applicability": "" }],
-  "dimensions": {
-    "d1_delegation_scope": { "score": 0, "rationale": "", "drift_indicators": [] },
-    "d2_substantive_alignment": { "score": 0, "rationale": "", "drift_indicators": [] },
-    "d3_procedural_mandate": { "score": 0, "rationale": "", "drift_indicators": [] },
-    "d4_object_purpose": { "score": 0, "rationale": "", "drift_indicators": [] },
-    "d5_non_contravention": { "score": 0, "rationale": "", "drift_indicators": [] },
-    "d6_temporal_territorial": { "score": 0, "rationale": "", "drift_indicators": [] },
-    "d7_reasonableness": { "score": 0, "rationale": "", "drift_indicators": [] }
-  },
-  "overall_score": 0,
-  "score_band": "fully_conforming|substantially_conforming|marginal|significantly_drifting|ultra_vires",
-  "alert_classification": "GREEN|AMBER|RED|CRITICAL",
-  "executive_summary": "",
-  "chain_of_authority": "",
-  "risk_areas": [],
-  "suggestions": [],
-  "changes": [],
-  "citations": [{ "source": "", "target": "" }],
-  "timeline": [{ "date": "", "event": "", "drift_impact": "Increased|Decreased|Neutral" }],
-  "drift_score": 0,
-  "alignment_status": "",
-  "pdf_overview": "",
-  "pdf_statutory_authority": "",
-  "pdf_conclusion": ""
+  "drift_score": <number 0-100>,
+  "alignment_status": "<Fully Aligned | Largely Aligned | Moderate Drift | Significant Drift | Critical Divergence>",
+  "changes": ["<specific change identified>"],
+  "explanation": "<detailed paragraph explaining the analysis>",
+  "risk_areas": ["<specific legal risk>"],
+  "suggestions": ["<actionable recommendation>"],
+  "citations": [
+    { "source": "<Section/Clause in Directive>", "target": "<Section/Clause in Parent Act>" }
+  ],
+  "timeline": [
+    { "date": "YYYY-MM-DD or Year", "event": "<Amendment or Notification Title>", "drift_impact": "<Increased | Decreased | Neutral>" }
+  ]
 }
 \`\`\`
 `;
       } else {
         systemPrompt += `
-CONVERSATIONAL MODE: For follow-up questions, respond conversationally without JSON. Be helpful, precise, and cite specific sections. Reference the 7-dimension framework when relevant.
+CONVERSATIONAL MODE: For follow-up questions, respond conversationally without JSON. Be helpful, precise, and cite specific sections.
 `;
       }
-
+      
       systemPrompt += `
-NEUTRALITY: This analysis assesses the degree to which an executive instrument operates within the boundaries of its enabling statute. It does not constitute a legal opinion on the validity of the instrument. Only a competent court can definitively determine whether an instrument is ultra vires.
-
-LIMITATIONS:
+LIMITATIONS: 
 - Never provide definitive legal advice.
 - If you are uncertain about a legal interpretation, say so explicitly.
-- End every drift analysis with the disclaimer: "This analysis is for informational purposes only and does not constitute legal advice. Please consult a qualified legal professional for specific legal matters."
+- End every drift analysis with: "⚖️ This analysis is for informational purposes only and does not constitute legal advice. Please consult a qualified legal professional for specific legal matters."
 `;
 
       try {
@@ -1162,7 +1030,7 @@ LIMITATIONS:
         role: 'assistant',
         content: data.message,
         timestamp: new Date(),
-        driftResult: data.driftResult ? normalizeDriftResult(data.driftResult) : undefined
+        driftResult: data.driftResult
       };
 
       if (privateMode) {
@@ -2229,328 +2097,118 @@ function DriftCard({
 
   const exportPDF = async (result: DriftResult) => {
     setIsExporting(true);
-    const SECTION_GAP = 12;
-    const PARAGRAPH_GAP = 6;
-    const LH = 0.45;
 
     try {
-      const pdf = new jsPDF('p', 'mm', 'a4');
+      const doc = new jsPDF('p', 'mm', 'a4');
       const margin = 20;
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
       const contentWidth = pageWidth - 2 * margin;
       let yPos = margin;
 
-      const ensureSpace = (needed: number) => {
-        if (yPos + needed > pageHeight - margin) {
-          pdf.addPage();
+      // Helper function to add text with wrapping and page breaks
+      const addWrappedText = (text: string, fontSize: number, isBold: boolean, color: number[] = [0, 0, 0], align: 'left' | 'center' | 'justify' = 'left') => {
+        doc.setFontSize(fontSize);
+        doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+        doc.setTextColor(color[0], color[1], color[2]);
+        
+        const lines = doc.splitTextToSize(text || '', contentWidth);
+        const textHeight = lines.length * fontSize * 0.4;
+        
+        if (yPos + textHeight > pageHeight - margin) {
+          doc.addPage();
           yPos = margin;
         }
-      };
 
-      const addText = (text: string, fontSize: number, isBold = false, color: number[] = [0, 0, 0], align: 'left' | 'center' | 'justify' = 'left') => {
-        pdf.setFontSize(fontSize);
-        pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
-        pdf.setTextColor(color[0], color[1], color[2]);
-        const lines = pdf.splitTextToSize(text || '', contentWidth);
-        for (let i = 0; i < lines.length; i++) {
-          ensureSpace(fontSize * LH + 2);
-          if (align === 'center') {
-            pdf.text(lines[i], pageWidth / 2, yPos, { align: 'center' });
-          } else if (align === 'justify' && i < lines.length - 1) {
-            pdf.text(lines[i], margin, yPos, { align: 'justify', maxWidth: contentWidth });
-          } else {
-            pdf.text(lines[i], margin, yPos);
-          }
-          yPos += fontSize * LH;
+        if (align === 'center') {
+          doc.text(text, pageWidth / 2, yPos, { align: 'center', maxWidth: contentWidth });
+        } else if (align === 'justify') {
+          doc.text(text, margin, yPos, { align: 'justify', maxWidth: contentWidth });
+        } else {
+          doc.text(text, margin, yPos, { maxWidth: contentWidth });
         }
+        
+        yPos += textHeight + fontSize * 0.2; // paragraph spacing
       };
 
-      const addGap = (gap: number) => { yPos += gap; };
-      const addLine = () => {
-        ensureSpace(4);
-        pdf.setDrawColor(226, 220, 208);
-        pdf.setLineWidth(0.5);
-        pdf.line(margin, yPos, margin + contentWidth, yPos);
-        yPos += 4;
-      };
+      // Title
+      addWrappedText(`Alignment Analysis: ${documentName || 'Document'}`, 18, true, [44, 30, 22], 'center');
+      yPos += 10;
 
-      // Helper to draw a score bar
-      const drawScoreBar = (x: number, y: number, width: number, score: number, color: number[]) => {
-        pdf.setFillColor(232, 226, 210);
-        pdf.roundedRect(x, y, width, 3, 1.5, 1.5, 'F');
-        const fillWidth = Math.max(2, (score / 100) * width);
-        pdf.setFillColor(color[0], color[1], color[2]);
-        pdf.roundedRect(x, y, fillWidth, 3, 1.5, 1.5, 'F');
-      };
+      // Intro
+      addWrappedText("Namaste! I am Vidhi-Vichara, an AI legal alignment assistant created by researchers at IIT Jodhpur. I have analyzed the provided Reserve Bank of India directive against its parent legislation to determine its legal alignment.", 11, true, [44, 30, 22], 'justify');
+      yPos += 8;
 
-      const hexToRgb = (hex: string): number[] => {
-        const r = parseInt(hex.slice(1, 3), 16);
-        const g = parseInt(hex.slice(3, 5), 16);
-        const b = parseInt(hex.slice(5, 7), 16);
-        return [r, g, b];
-      };
+      // Statutory Authority and Alignment
+      addWrappedText('Statutory Authority and Alignment', 14, true, [255, 153, 51]);
+      yPos += 2;
+      addWrappedText(result.pdf_statutory_authority || "Information not available.", 11, false, [60, 60, 60], 'justify');
+      yPos += 8;
 
-      const overall = result.overall_score ?? result.drift_score;
-      const band = result.score_band ? getScoreBandLabel(overall) : result.alignment_status;
-      const alert = result.alert_classification ?? (overall >= 75 ? 'GREEN' : overall >= 50 ? 'AMBER' : 'CRITICAL') as AlertClassification;
-      const alertCol = hexToRgb(getAlertColor(alert));
-      const scoreCol = hexToRgb(getScoreColor(overall));
+      // Key Changes and Compliance
+      addWrappedText('Key Changes and Compliance', 14, true, [255, 153, 51]);
+      yPos += 2;
+      addWrappedText(result.pdf_overview || "Information not available.", 11, false, [60, 60, 60], 'justify');
+      yPos += 8;
 
-      // ========== PAGE 1: COVER ==========
-      addGap(30);
-      addText('VIDHI-VICHARA', 24, true, [255, 153, 51], 'center');
-      addGap(4);
-      addText('Executive Action Drift Analysis Report', 14, true, [44, 30, 22], 'center');
-      addGap(2);
-      addText('Methodology v4.0 — 7-Dimension Statutory Conformance Framework', 10, false, [92, 78, 70], 'center');
-      addGap(SECTION_GAP);
-      addLine();
-      addGap(SECTION_GAP);
+      // Alignment Verdict
+      addWrappedText(result.pdf_conclusion || "Information not available.", 11, true, [44, 30, 22], 'justify');
+      yPos += 12;
 
-      if (result.instrument_profile) {
-        addText(`Instrument: ${result.instrument_profile.title}`, 12, true, [44, 30, 22]);
-        addGap(2);
-        addText(`Type: ${result.instrument_profile.type.toUpperCase()} | Authority: ${result.instrument_profile.issuing_authority}`, 10, false, [92, 78, 70]);
-        addGap(2);
-        addText(`Enabling Provision: ${result.instrument_profile.enabling_provision}`, 10, false, [92, 78, 70]);
-        addGap(PARAGRAPH_GAP);
-      }
-      if (result.parent_act) {
-        addText(`Parent Act: ${result.parent_act.name} (${result.parent_act.year})`, 12, true, [44, 30, 22]);
-        addGap(2);
-        addText(`Delegation Clause: ${result.parent_act.delegation_clause}`, 10, false, [92, 78, 70]);
-        addGap(SECTION_GAP);
-      }
-
-      // Score box
-      ensureSpace(40);
-      pdf.setFillColor(scoreCol[0], scoreCol[1], scoreCol[2]);
-      pdf.roundedRect(margin, yPos, contentWidth, 30, 3, 3, 'F');
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(20);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(`OVERALL SCORE: ${overall}%`, pageWidth / 2, yPos + 13, { align: 'center' });
-      pdf.setFontSize(11);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`${band} | Alert: ${alert}`, pageWidth / 2, yPos + 23, { align: 'center' });
-      yPos += 36;
-      addGap(SECTION_GAP);
-
-      addText(`Document: ${documentName || 'Uploaded Executive Instrument'}`, 10, false, [92, 78, 70], 'center');
-      addGap(4);
-      addText(`Report generated by Vidhi-Vichara | IIT Jodhpur`, 10, false, [92, 78, 70], 'center');
-      addGap(4);
-      addText(`Date: ${new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}`, 10, false, [92, 78, 70], 'center');
-
-      // ========== PAGE 2: EXECUTIVE SUMMARY ==========
-      pdf.addPage();
+      // Add Visuals on Page 2
+      doc.addPage();
       yPos = margin;
-      addText('EXECUTIVE SUMMARY', 16, true, [255, 153, 51]);
-      addGap(PARAGRAPH_GAP);
-      addText(result.executive_summary || result.pdf_overview || 'No executive summary available.', 11, false, [44, 30, 22], 'justify');
-      addGap(SECTION_GAP);
-
-      if (result.pdf_statutory_authority) {
-        addText('Statutory Authority and Alignment', 14, true, [255, 153, 51]);
-        addGap(3);
-        addText(result.pdf_statutory_authority, 11, false, [60, 60, 60], 'justify');
-        addGap(SECTION_GAP);
-      }
-
-      if (result.risk_areas?.length > 0) {
-        addText('KEY RISK AREAS', 14, true, [255, 153, 51]);
-        addGap(3);
-        result.risk_areas.forEach(r => {
-          ensureSpace(8);
-          addText(`• ${r}`, 10, false, [60, 60, 60]);
-          addGap(2);
-        });
-        addGap(PARAGRAPH_GAP);
-      }
-
-      if (result.suggestions?.length > 0) {
-        addText('RECOMMENDATIONS', 14, true, [255, 153, 51]);
-        addGap(3);
-        result.suggestions.forEach(s => {
-          ensureSpace(8);
-          addText(`• ${s}`, 10, false, [60, 60, 60]);
-          addGap(2);
-        });
-        addGap(PARAGRAPH_GAP);
-      }
-
-      if (result.pdf_conclusion) {
-        addGap(PARAGRAPH_GAP);
-        addText(result.pdf_conclusion, 11, true, [44, 30, 22], 'justify');
-      }
-
-      // ========== PAGE 3-4: 7-DIMENSION ANALYSIS ==========
-      if (result.dimensions) {
-        pdf.addPage();
-        yPos = margin;
-        addText('7-DIMENSION STATUTORY CONFORMANCE ASSESSMENT', 16, true, [255, 153, 51]);
-        addGap(SECTION_GAP);
-
-        const dimMeta = [
-          { key: 'd1_delegation_scope', label: 'D1: Delegation Scope Compliance', weight: '20%' },
-          { key: 'd2_substantive_alignment', label: 'D2: Substantive Alignment', weight: '20%' },
-          { key: 'd3_procedural_mandate', label: 'D3: Procedural Mandate Adherence', weight: '15%' },
-          { key: 'd4_object_purpose', label: 'D4: Object & Purpose Fidelity', weight: '15%' },
-          { key: 'd5_non_contravention', label: 'D5: Non-Contravention', weight: '15%' },
-          { key: 'd6_temporal_territorial', label: 'D6: Temporal/Territorial Compliance', weight: '5%' },
-          { key: 'd7_reasonableness', label: 'D7: Reasonableness', weight: '10%' },
-        ];
-
-        dimMeta.forEach(dm => {
-          const dimData = (result.dimensions as any)[dm.key] as DimensionScore | undefined;
-          if (!dimData) return;
-          const dColor = hexToRgb(getScoreColor(dimData.score));
-          const dBandLabel = getScoreBandLabel(dimData.score);
-
-          // Check space for header + bar + at least some rationale
-          ensureSpace(30);
-
-          // Dimension header with score
-          addText(`${dm.label} (${dm.weight}) — Score: ${dimData.score}/100 [${dBandLabel}]`, 11, true, dColor);
-          addGap(2);
-
-          // Score bar
-          drawScoreBar(margin, yPos, contentWidth, dimData.score, dColor);
-          yPos += 6;
-
-          // Rationale
-          addText(dimData.rationale || 'No rationale provided.', 10, false, [60, 60, 60], 'justify');
-          addGap(2);
-
-          // Drift indicators
-          if (dimData.drift_indicators?.length > 0) {
-            dimData.drift_indicators.forEach(ind => {
-              ensureSpace(6);
-              addText(`  • ${ind}`, 9, false, [92, 78, 70]);
-              addGap(1);
-            });
-          }
-          addGap(PARAGRAPH_GAP);
-        });
-      }
-
-      // ========== PROVISION MAPPING ==========
-      if (result.provision_mappings && result.provision_mappings.length > 0) {
-        ensureSpace(40);
-        if (yPos > margin + 20) { pdf.addPage(); yPos = margin; }
-        addText('PROVISION-LEVEL MAPPING', 16, true, [255, 153, 51]);
-        addGap(PARAGRAPH_GAP);
-
-        // Table header
-        const colWidths = [contentWidth * 0.22, contentWidth * 0.22, contentWidth * 0.16, contentWidth * 0.40];
-        const headers = ['Instrument Provision', 'Act Section', 'Status', 'Explanation'];
-
-        ensureSpace(12);
-        pdf.setFillColor(226, 220, 208);
-        pdf.rect(margin, yPos, contentWidth, 8, 'F');
-        pdf.setFontSize(8);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(44, 30, 22);
-        let colX = margin + 2;
-        headers.forEach((h, i) => {
-          pdf.text(h, colX, yPos + 5.5);
-          colX += colWidths[i];
-        });
-        yPos += 10;
-
-        // Table rows
-        result.provision_mappings.forEach(pm => {
-          const rowTexts = [pm.instrument_provision, pm.act_section, pm.alignment.toUpperCase(), pm.explanation];
-          const wrappedRows = rowTexts.map((t, i) => pdf.splitTextToSize(t || '', colWidths[i] - 4));
-          const maxLines = Math.max(...wrappedRows.map(r => r.length));
-          const rowHeight = Math.max(8, maxLines * 3.5 + 3);
-
-          ensureSpace(rowHeight + 2);
-          pdf.setDrawColor(226, 220, 208);
-          pdf.setLineWidth(0.3);
-          pdf.line(margin, yPos, margin + contentWidth, yPos);
-
-          pdf.setFontSize(8);
-          pdf.setFont('helvetica', 'normal');
-          pdf.setTextColor(60, 60, 60);
-
-          colX = margin + 2;
-          wrappedRows.forEach((lines, i) => {
-            lines.forEach((line: string, li: number) => {
-              pdf.text(line, colX, yPos + 4 + li * 3.5);
-            });
-            colX += colWidths[i];
-          });
-          yPos += rowHeight;
-        });
-        addGap(SECTION_GAP);
-      }
-
-      // ========== PRECEDENT REVIEW ==========
-      if (result.precedent_citations && result.precedent_citations.length > 0) {
-        ensureSpace(30);
-        addText('PRECEDENT REVIEW', 14, true, [255, 153, 51]);
-        addGap(PARAGRAPH_GAP);
-
-        result.precedent_citations.forEach(pc => {
-          ensureSpace(16);
-          addText(`${pc.case_name} (${pc.year})`, 10, true, [44, 30, 22]);
-          addGap(1);
-          addText(`Principle: ${pc.principle}`, 9, false, [60, 60, 60]);
-          addGap(1);
-          addText(`Applicability: ${pc.applicability}`, 9, false, [92, 78, 70]);
-          addGap(PARAGRAPH_GAP);
-        });
-      }
-
-      // ========== VISUALS PAGE ==========
-      pdf.addPage();
-      yPos = margin;
-      addText('DASHBOARD VISUALIZATIONS', 16, true, [255, 153, 51]);
-      addGap(PARAGRAPH_GAP);
-
+      
       const { toJpeg } = await import('html-to-image');
-
-      const addVisual = async (selector: string, title: string) => {
-        const el = document.getElementById(selector) || document.querySelector(`[data-pdf-visual="${selector}"]`) || document.querySelector(`[data-analysis-dashboard]`) as HTMLElement;
-        if (!el) return;
-        try {
-          ensureSpace(60);
-          if (title) { addText(title, 12, true, [44, 30, 22]); addGap(4); }
-          const dataUrl = await toJpeg(el, { pixelRatio: 2, quality: 0.9, backgroundColor: '#F4F1EA' });
+      
+      const addVisual = async (elementId: string, title: string) => {
+        const el = document.getElementById(elementId) || document.querySelector(`[data-pdf-visual="${elementId}"]`) as HTMLElement;
+        if (el) {
+          if (yPos > pageHeight - margin - 60) {
+            doc.addPage();
+            yPos = margin;
+          }
+          
+          addWrappedText(title, 14, true, [44, 30, 22]);
+          yPos += 5;
+          
+          const dataUrl = await toJpeg(el, { 
+            pixelRatio: 1.5,
+            quality: 0.9,
+            backgroundColor: '#F4F1EA',
+            style: { transform: 'scale(1)', transformOrigin: 'top left' }
+          });
+          
           const img = new Image();
           img.src = dataUrl;
           await new Promise((resolve) => { img.onload = resolve; });
+          
           const imgHeight = (img.height * contentWidth) / img.width;
-          ensureSpace(imgHeight);
-          pdf.addImage(dataUrl, 'JPEG', margin, yPos, contentWidth, imgHeight);
-          yPos += imgHeight + SECTION_GAP;
-        } catch (e) {
-          console.error('Failed to capture visual:', e);
+          
+          if (yPos + imgHeight > pageHeight - margin) {
+            doc.addPage();
+            yPos = margin;
+          }
+          
+          doc.addImage(dataUrl, 'JPEG', margin, yPos, contentWidth, imgHeight);
+          yPos += imgHeight + 15;
         }
       };
 
-      await addVisual('pdf-charts-container', 'Conformance Analysis Charts');
-      await addVisual('citation-graph', 'Citation Network');
+      await addVisual('pdf-charts-container', 'Alignment Analyses');
+      await addVisual('citation-graph', 'Citation Graph');
       await addVisual('chain-of-authority', 'Chain of Authority');
 
-      // ========== FINAL PAGE: METHODOLOGY & DISCLAIMER ==========
-      pdf.addPage();
-      yPos = margin;
-      addText('METHODOLOGY', 14, true, [255, 153, 51]);
-      addGap(PARAGRAPH_GAP);
-      addText('This analysis was conducted using the Vidhi-Vichara 7-Dimension Statutory Conformance Framework v4.0. The framework evaluates executive instruments across seven analytically distinct dimensions: Delegation Scope Compliance (D1, 20%), Substantive Alignment (D2, 20%), Procedural Mandate Adherence (D3, 15%), Object & Purpose Fidelity (D4, 15%), Non-Contravention (D5, 15%), Temporal/Territorial Compliance (D6, 5%), and Reasonableness (D7, 10%). Each dimension is scored 0-100 using rubric-anchored assessment. The overall statutory conformance score is the weighted mean.', 9, false, [92, 78, 70], 'justify');
-      addGap(SECTION_GAP);
+      // Disclaimer
+      if (yPos > pageHeight - margin - 20) {
+        doc.addPage();
+        yPos = margin;
+      }
+      yPos += 10;
+      addWrappedText('⚖️ This analysis is for informational purposes only and does not constitute legal advice. Please consult a qualified legal professional for specific legal matters.', 9, false, [100, 100, 100], 'center');
 
-      addText('DISCLAIMER', 14, true, [255, 153, 51]);
-      addGap(PARAGRAPH_GAP);
-      addText('This analysis assesses the degree to which an executive instrument operates within the boundaries of its enabling statute. It does not constitute a legal opinion on the validity of the instrument. Only a competent court can definitively determine whether an instrument is ultra vires. This analysis is for informational purposes only and does not constitute legal advice. Please consult a qualified legal professional for specific legal matters.', 9, false, [100, 100, 100], 'justify');
-      addGap(SECTION_GAP);
-      addText('Vidhi-Vichara | IIT Jodhpur Research Project | Version 4.0 | March 2026', 9, false, [150, 150, 150], 'center');
-
-      pdf.save(`Vidhi-Vichara_Report_${conversationId || 'analysis'}.pdf`);
-
+      doc.save(`Report_${conversationId || 'analysis'}.pdf`);
+      
       if (!privateMode && user) {
         try {
           await addDoc(collection(db, 'reports'), {
@@ -2560,7 +2218,7 @@ function DriftCard({
             type: 'pdf_export',
             documentName: documentName || null
           });
-          logActivity('export_pdf', { score: overall, documentName });
+          logActivity('export_pdf', { score: result.drift_score, documentName });
         } catch (e) {
           console.error("Failed to save report to history", e);
         }
@@ -2592,58 +2250,33 @@ function DriftCard({
           
           {/* Intro Banner */}
           <div className="p-6 bg-saffron/10 rounded-xl border border-saffron/30">
-            <p className="text-base text-ink font-medium italic leading-relaxed">
-              {result.executive_summary || "Namaste! I am Vidhi-Vichara, an AI legal alignment assistant created by researchers at IIT Jodhpur. I have analyzed the provided executive instrument against its parent legislation to determine its statutory conformance."}
+            <p className="text-lg text-ink font-medium italic">
+              "Namaste! I am Vidhi-Vichara, an AI legal alignment assistant created by researchers at IIT Jodhpur. I have analyzed the provided Reserve Bank of India directive against its parent legislation to determine its legal alignment."
             </p>
           </div>
 
-          {/* Instrument & Parent Act Info */}
-          {result.instrument_profile && (
-            <div className="space-y-4">
-              <h3 className="text-xl font-bold text-[#FF9933] border-b-2 border-[#FF9933]/20 pb-2">Instrument Profile</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div><span className="font-bold text-ink">Title:</span> <span className="text-ink-light">{result.instrument_profile.title}</span></div>
-                <div><span className="font-bold text-ink">Type:</span> <span className="text-ink-light uppercase">{result.instrument_profile.type}</span></div>
-                <div><span className="font-bold text-ink">Authority:</span> <span className="text-ink-light">{result.instrument_profile.issuing_authority}</span></div>
-                <div><span className="font-bold text-ink">Enabling Provision:</span> <span className="text-ink-light">{result.instrument_profile.enabling_provision}</span></div>
-              </div>
-              {result.parent_act && (
-                <div className="mt-3 p-4 bg-white/50 rounded-lg border border-parchment-border">
-                  <p className="text-sm font-bold text-ink">Parent Act: {result.parent_act.name} ({result.parent_act.year})</p>
-                  <p className="text-xs text-ink-light mt-1">Delegation: {result.parent_act.delegation_clause}</p>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Statutory Authority and Alignment */}
-          {result.pdf_statutory_authority && (
-            <div className="space-y-4">
-              <h3 className="text-xl font-bold text-[#FF9933] border-b-2 border-[#FF9933]/20 pb-2">Statutory Authority and Alignment</h3>
-              <p className="text-base text-ink text-justify">
-                {result.pdf_statutory_authority}
-              </p>
-            </div>
-          )}
+          <div className="space-y-4">
+            <h3 className="text-xl font-bold text-[#FF9933] border-b-2 border-[#FF9933]/20 pb-2">Statutory Authority and Alignment</h3>
+            <p className="text-base text-ink text-justify">
+              {result.pdf_statutory_authority || "Information not available."}
+            </p>
+          </div>
 
           {/* Key Changes and Compliance */}
-          {result.pdf_overview && (
-            <div className="space-y-4">
-              <h3 className="text-xl font-bold text-[#FF9933] border-b-2 border-[#FF9933]/20 pb-2">Key Changes and Compliance</h3>
-              <p className="text-base text-ink text-justify">
-                {result.pdf_overview}
-              </p>
-            </div>
-          )}
+          <div className="space-y-4">
+            <h3 className="text-xl font-bold text-[#FF9933] border-b-2 border-[#FF9933]/20 pb-2">Key Changes and Compliance</h3>
+            <p className="text-base text-ink text-justify">
+              {result.pdf_overview || "Information not available."}
+            </p>
+          </div>
 
           {/* Alignment Verdict */}
-          {result.pdf_conclusion && (
-            <div className="space-y-4">
-              <p className="text-base text-ink text-justify font-medium">
-                {result.pdf_conclusion}
-              </p>
-            </div>
-          )}
+          <div className="space-y-4">
+            <p className="text-base text-ink text-justify font-medium">
+              {result.pdf_conclusion || "Information not available."}
+            </p>
+          </div>
 
           {/* Visuals */}
           <div className="pt-8 border-t border-parchment-border/50 space-y-10">
