@@ -321,33 +321,12 @@ export default function AdminPanel() {
                     {reports.map(report => (
                       <div key={report.id} className="p-4 bg-parchment rounded-xl border border-parchment-border">
                         <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-semibold"><TranslatedText text="Score:" /> {report.driftResult?.overall_score ?? report.driftResult?.drift_score}%</h3>
+                          <h3 className="font-semibold"><TranslatedText text="Drift Score:" /> {report.driftResult?.drift_score}</h3>
                           <span className="text-xs text-ink-light"><TranslatedText text="User:" /> {report.userId}</span>
                         </div>
                         <p className="text-sm text-ink-light">
                           <TranslatedText text="Status:" /> {report.driftResult?.alignment_status}
-                          {report.driftResult?.alert_classification && ` | Alert: ${report.driftResult.alert_classification}`}
                         </p>
-                        {report.driftResult?.dimensions && (
-                          <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-parchment-border/30">
-                            <div className="text-[10px] text-ink-light">
-                              <div className="font-bold uppercase tracking-tighter"><TranslatedText text="Delegation" /></div>
-                              <div className="text-xs font-bold text-ink">{report.driftResult.dimensions.d1_delegation_scope?.score}</div>
-                            </div>
-                            <div className="text-[10px] text-ink-light">
-                              <div className="font-bold uppercase tracking-tighter"><TranslatedText text="Substantive" /></div>
-                              <div className="text-xs font-bold text-ink">{report.driftResult.dimensions.d2_substantive_alignment?.score}</div>
-                            </div>
-                            <div className="text-[10px] text-ink-light">
-                              <div className="font-bold uppercase tracking-tighter"><TranslatedText text="Procedural" /></div>
-                              <div className="text-xs font-bold text-ink">{report.driftResult.dimensions.d3_procedural_mandate?.score}</div>
-                            </div>
-                            <div className="text-[10px] text-ink-light">
-                              <div className="font-bold uppercase tracking-tighter"><TranslatedText text="Purpose" /></div>
-                              <div className="text-xs font-bold text-ink">{report.driftResult.dimensions.d4_object_purpose?.score}</div>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     ))}
                     {reports.length === 0 && (
