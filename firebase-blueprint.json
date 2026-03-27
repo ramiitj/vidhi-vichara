@@ -1,0 +1,108 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the application",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "Document": {
+      "title": "Document",
+      "description": "An uploaded reference document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "storagePath": { "type": "string" },
+        "uploadedAt": { "type": "string", "format": "date-time" },
+        "size": { "type": "number" },
+        "status": { "type": "string", "enum": ["processing", "ready", "error"] },
+        "pageCount": { "type": "number" },
+        "textContent": { "type": "string" }
+      },
+      "required": ["id", "userId", "name", "uploadedAt", "status"]
+    },
+    "Chunk": {
+      "title": "Chunk",
+      "description": "A text chunk from a document",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "index": { "type": "number" },
+        "page": { "type": "number" }
+      },
+      "required": ["text", "index"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "A chat session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "language": { "type": "string" },
+        "documentId": { "type": "string" },
+        "documentName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "role": { "type": "string", "enum": ["user", "assistant"] },
+              "content": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "driftResult": { "type": "object" }
+            },
+            "required": ["role", "content", "timestamp"]
+          }
+        }
+      },
+      "required": ["id", "userId", "title", "createdAt", "updatedAt", "messages"]
+    },
+    "Translation": {
+      "title": "Translation",
+      "description": "A cached translation for UI text",
+      "type": "object",
+      "properties": {
+        "original": { "type": "string" },
+        "language": { "type": "string" },
+        "translated": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["original", "language", "translated", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/documents/{documentId}": {
+      "schema": { "$ref": "#/entities/Document" },
+      "description": "Uploaded documents"
+    },
+    "/documents/{documentId}/chunks/{chunkId}": {
+      "schema": { "$ref": "#/entities/Chunk" },
+      "description": "Chunks of an uploaded document"
+    },
+    "/conversations/{conversationId}": {
+      "schema": { "$ref": "#/entities/Conversation" },
+      "description": "Chat sessions"
+    },
+    "/translations/{translationId}": {
+      "schema": { "$ref": "#/entities/Translation" },
+      "description": "Global translation cache"
+    }
+  }
+}

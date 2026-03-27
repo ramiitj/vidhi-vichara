@@ -1,0 +1,7 @@
+{
+  "name": "Vidhi-Vichara",
+  "description": "Conversational Legal Drift Analyzer",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

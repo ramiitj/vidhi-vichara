@@ -1,0 +1,127 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+       return request.auth != null;
+    }
+
+    function isOwner(userId) {
+       return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email_verified == true) &&
+        (request.auth.token.email == "kannaganuthula@gmail.com" || request.auth.token.email == "mks@iitr.ac.in");
+    }
+
+    function hasRequiredFields(fields) {
+       return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function uidNotModified(field) {
+       return !('field' in request.resource.data) ||
+         request.resource.data[field] == resource.data[field];
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+       return request.resource.data[field] is string &&
+         request.resource.data[field].size() >= minLen &&
+         request.resource.data[field].size() <= maxLen;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidConversation(data) {
+      return hasRequiredFields(['userId', 'title', 'createdAt', 'updatedAt', 'messages']) &&
+             hasOnlyAllowedFields(['userId', 'title', 'documentId', 'documentName', 'createdAt', 'updatedAt', 'messages', 'isPublic']) &&
+             data.userId is string &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.messages is list && data.messages.size() < 1000;
+    }
+
+    function isValidDocument(data) {
+      return hasRequiredFields(['userId', 'name', 'uploadedAt', 'status']) &&
+             hasOnlyAllowedFields(['userId', 'name', 'uploadedAt', 'status', 'pageCount', 'textContent', 'snippet']) &&
+             data.userId is string &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.status in ['processing', 'ready', 'error'] &&
+             (data.textContent == null || data.textContent.size() < 1000000);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /settings/{docId} {
+      allow read: if docId == 'global' || isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /tasks/{docId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId) && hasRequiredFields(['userId', 'title', 'completed', 'createdAt']);
+      allow update: if isOwner(resource.data.userId) && uidNotModified('userId') && uidNotModified('createdAt');
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    match /user_chunks/{docId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId) && hasRequiredFields(['userId', 'docName', 'text', 'index', 'createdAt']);
+      allow update: if isOwner(resource.data.userId) && uidNotModified('userId') && uidNotModified('createdAt');
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    match /knowledgebase_chunks/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /conversations/{docId} {
+      allow read: if isOwner(resource.data.userId) || (resource.data.isPublic == true);
+      allow create: if isOwner(request.resource.data.userId) && isValidConversation(request.resource.data);
+      allow update: if isOwner(resource.data.userId) && isValidConversation(request.resource.data) && uidNotModified('userId') && uidNotModified('createdAt');
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    match /documents/{docId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId) && isValidDocument(request.resource.data);
+      allow update: if isOwner(resource.data.userId) && isValidDocument(request.resource.data) && uidNotModified('userId') && uidNotModified('uploadedAt');
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    match /user_activity/{docId} {
+      allow read: if isAdmin();
+      allow create: if isOwner(request.resource.data.userId);
+    }
+
+    match /reports/{docId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+    }
+
+    match /assets/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /translations/{docId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && 
+                    hasRequiredFields(['original', 'language', 'translated', 'createdAt']) &&
+                    validStringLength('original', 1, 5000) &&
+                    validStringLength('translated', 1, 5000);
+    }
+  }
+}

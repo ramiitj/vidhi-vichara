@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vidhi-Vichara | Legal Alignment Engine</title>
+    <script>
+      // Define process.env for the browser to prevent crashes
+      window.process = window.process || {};
+      window.process.env = window.process.env || {};
+      // Only set if not already set by build-time injection
+      if (typeof window.process.env.GEMINI_API_KEY === 'undefined') {
+        window.process.env.GEMINI_API_KEY = "";
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
