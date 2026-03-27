@@ -198,7 +198,7 @@ export async function generateChatResponse(
     if (language && language !== 'English') {
       finalSystemPrompt += `\n\nIMPORTANT: You are a native speaker of ${language}. You must think and respond naturally in ${language}, leveraging your deep understanding of its linguistic nuances, legal terminology in that language, and cultural context. Use the native script of ${language} for all responses.`;
     }
-    finalSystemPrompt += "\n\nIMPORTANT: Do not use code blocks for your main narrative response. Format your narrative clearly as plain text with markdown. When performing drift analysis, embed a single JSON code block (```json ... ```) containing the complete structured analysis result with all 7 dimension scores, provision mappings, precedent citations, and all fields specified in the system prompt schema.";
+    finalSystemPrompt += "\n\nIMPORTANT: Do not use code blocks for your main response. Format your response clearly as plain text with markdown. Do not include any code-like formatting, symbols, or marks in your main text response. Your response should be clean, neat, and professional. You MUST also return a JSON object with the following structure: { \"drift_score\": number, \"alignment_status\": string, \"executive_summary\": string, \"changes\": string[], \"risk_areas\": string[], \"suggestions\": string[], \"citations\": { \"source\": string, \"target\": string }[], \"timeline\": { \"date\": string, \"event\": string, \"drift_impact\": string }[], \"chain_of_authority\": string, \"pdf_overview\": string, \"pdf_statutory_authority\": string, \"pdf_conclusion\": string }";
 
     const response = await retryWithBackoff(() => getAI().models.generateContent({
       model: "gemini-3.1-pro-preview",
@@ -209,7 +209,7 @@ export async function generateChatResponse(
       config: {
         systemInstruction: finalSystemPrompt,
         temperature: 0.2,
-        maxOutputTokens: 16384,
+        maxOutputTokens: 8192,
         topP: 0.95,
         tools: [{ googleSearch: {} }],
       },
@@ -220,9 +220,8 @@ export async function generateChatResponse(
     let cleanMessage = aiMessage;
 
     try {
-      // Try to extract JSON from markdown code block first
       const jsonMatch = aiMessage.match(/\`\`\`(?:json)?\n?([\s\S]*?)\n?\`\`\`/);
-      if (jsonMatch && (jsonMatch[1].includes('"drift_score"') || jsonMatch[1].includes('"dimensions"') || jsonMatch[1].includes('"overall_score"'))) {
+      if (jsonMatch && jsonMatch[1].includes('"drift_score"')) {
         try {
           driftResult = JSON.parse(jsonMatch[1]);
           cleanMessage = aiMessage.replace(jsonMatch[0], '').trim();
@@ -230,10 +229,9 @@ export async function generateChatResponse(
           console.error("Failed to parse JSON from markdown block, falling back to regex search");
         }
       }
-
-      // Fallback: search for raw JSON object with either new or legacy format markers
+      
       if (!driftResult) {
-        const start = aiMessage.search(/\{\s*"(?:instrument_profile|drift_score|dimensions)"/);
+        const start = aiMessage.search(/\{\s*"drift_score"/);
         if (start !== -1) {
           let end = aiMessage.lastIndexOf("}");
           while (end > start) {
