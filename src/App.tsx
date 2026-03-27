@@ -49,128 +49,6 @@ interface DriftResult {
   pdf_overview?: string;
   pdf_statutory_authority?: string;
   pdf_conclusion?: string;
-
-  // Legacy compatibility fields
-  drift_score: number;
-  alignment_status: string;
-  changes: string[];
-  citations?: { source: string; target: string }[];
-  timeline?: { date: string; event: string; drift_impact: string }[];
-}
-
-// Helper functions for drift scoring
-function getScoreBand(score: number): ScoreBand {
-  if (score >= 90) return 'fully_conforming';
-  if (score >= 75) return 'substantially_conforming';
-  if (score >= 50) return 'marginal';
-  if (score >= 25) return 'significantly_drifting';
-  return 'ultra_vires';
-}
-
-function getAlertClassification(result: DriftResult): AlertClassification {
-  const dims = result.dimensions;
-  const overall = result.overall_score ?? result.drift_score;
-  if (!dims) {
-    if (overall < 50) return 'CRITICAL';
-    if (overall < 75) return 'AMBER';
-    return 'GREEN';
-  }
-  const scores = [
-    dims.d1_delegation_scope.score,
-    dims.d2_substantive_alignment.score,
-    dims.d3_procedural_mandate.score,
-    dims.d4_object_purpose.score,
-    dims.d5_non_contravention.score,
-    dims.d6_temporal_territorial.score,
-    dims.d7_reasonableness.score,
-  ];
-  if (overall < 50 || dims.d1_delegation_scope.score < 40) return 'CRITICAL';
-  const belowFifty = scores.filter(s => s < 50).length;
-  const marginal = scores.filter(s => s >= 50 && s < 75).length;
-  if (belowFifty > 0 || marginal >= 2) return 'RED';
-  if (marginal > 0) return 'AMBER';
-  return 'GREEN';
-}
-
-function getScoreBandLabel(input: ScoreBand | number): string {
-  if (typeof input === 'number') {
-    if (input >= 90) return 'Fully Conforming';
-    if (input >= 75) return 'Substantially Conforming';
-    if (input >= 50) return 'Marginal / Partially Drifting';
-    if (input >= 25) return 'Significantly Drifting';
-    return 'Ultra Vires';
-  }
-  const labels: Record<ScoreBand, string> = {
-    fully_conforming: 'Fully Conforming',
-    substantially_conforming: 'Substantially Conforming',
-    marginal: 'Marginal / Partially Drifting',
-    significantly_drifting: 'Significantly Drifting',
-    ultra_vires: 'Ultra Vires',
-  };
-  return labels[input];
-}
-
-function getScoreColor(score: number): string {
-  if (score >= 90) return '#138808';
-  if (score >= 75) return '#2E8B57';
-  if (score >= 50) return '#FF9933';
-  if (score >= 25) return '#E65100';
-  return '#D32F2F';
-}
-
-function getAlertColor(alert: AlertClassification): string {
-  const colors: Record<AlertClassification, string> = {
-    GREEN: '#138808',
-    AMBER: '#FF9933',
-    RED: '#D32F2F',
-    CRITICAL: '#8B0000',
-  };
-  return colors[alert];
-}
-
-function computeOverallScore(dims: DriftResult['dimensions']): number {
-  if (!dims) return 0;
-  return Math.round(
-    dims.d1_delegation_scope.score * 0.20 +
-    dims.d2_substantive_alignment.score * 0.20 +
-    dims.d3_procedural_mandate.score * 0.15 +
-    dims.d4_object_purpose.score * 0.15 +
-    dims.d5_non_contravention.score * 0.15 +
-    dims.d6_temporal_territorial.score * 0.05 +
-    dims.d7_reasonableness.score * 0.10
-  );
-}
-
-function normalizeDriftResult(raw: any): DriftResult {
-  // If it already has the new format dimensions, use them
-  if (raw.dimensions) {
-    const overall = raw.overall_score ?? computeOverallScore(raw.dimensions);
-    const band = raw.score_band ?? getScoreBand(overall);
-    return {
-      ...raw,
-      overall_score: overall,
-      score_band: band,
-      alert_classification: raw.alert_classification ?? getAlertClassification({ ...raw, overall_score: overall }),
-      drift_score: raw.drift_score ?? overall,
-      alignment_status: raw.alignment_status ?? getScoreBandLabel(band),
-      changes: raw.changes ?? (raw.provision_mappings || []).map((p: ProvisionMapping) => `${p.instrument_provision}: ${p.alignment}`),
-      executive_summary: raw.executive_summary ?? '',
-      chain_of_authority: raw.chain_of_authority ?? '',
-      risk_areas: raw.risk_areas ?? [],
-      suggestions: raw.suggestions ?? [],
-    };
-  }
-  // Legacy format — return as-is with defaults
-  return {
-    ...raw,
-    drift_score: raw.drift_score ?? 0,
-    alignment_status: raw.alignment_status ?? 'Unknown',
-    executive_summary: raw.executive_summary ?? raw.explanation ?? '',
-    chain_of_authority: raw.chain_of_authority ?? '',
-    risk_areas: raw.risk_areas ?? [],
-    suggestions: raw.suggestions ?? [],
-    changes: raw.changes ?? [],
-  };
 }
 
 interface Conversation {
@@ -746,30 +624,9 @@ export default function App() {
       content += `[${role}] (${time})\n`;
       content += `${msg.content}\n`;
       if (msg.driftResult) {
-        const dr = msg.driftResult;
-        const score = dr.overall_score ?? dr.drift_score;
         content += `\n[DRIFT ANALYSIS SUMMARY]\n`;
-        content += `Overall Score: ${score}% | Status: ${dr.alignment_status}\n`;
-        if (dr.alert_classification) content += `Alert: ${dr.alert_classification}\n`;
-        if (dr.instrument_profile) {
-          content += `Instrument: ${dr.instrument_profile.title} (${dr.instrument_profile.type})\n`;
-          if (dr.instrument_profile.issuing_authority) content += `Authority: ${dr.instrument_profile.issuing_authority}\n`;
-        }
-        if (dr.parent_act) {
-          content += `Parent Act: ${dr.parent_act.name} (${dr.parent_act.year})\n`;
-        }
-        if (dr.dimensions) {
-          content += `\n7-Dimension Scores:\n`;
-          content += `  D1 Delegation Scope: ${dr.dimensions.d1_delegation_scope?.score}/100\n`;
-          content += `  D2 Substantive Alignment: ${dr.dimensions.d2_substantive_alignment?.score}/100\n`;
-          content += `  D3 Procedural Mandate: ${dr.dimensions.d3_procedural_mandate?.score}/100\n`;
-          content += `  D4 Object & Purpose: ${dr.dimensions.d4_object_purpose?.score}/100\n`;
-          content += `  D5 Non-Contravention: ${dr.dimensions.d5_non_contravention?.score}/100\n`;
-          content += `  D6 Temporal/Territorial: ${dr.dimensions.d6_temporal_territorial?.score}/100\n`;
-          content += `  D7 Reasonableness: ${dr.dimensions.d7_reasonableness?.score}/100\n`;
-        }
-        if (dr.risk_areas?.length) content += `\nRisk Areas: ${dr.risk_areas.join('; ')}\n`;
-        if (dr.suggestions?.length) content += `Suggestions: ${dr.suggestions.join('; ')}\n`;
+        content += `Score: ${msg.driftResult.drift_score}\n`;
+        content += `Status: ${msg.driftResult.alignment_status}\n`;
       }
       content += `------------------------------------\n\n`;
     });
@@ -2091,9 +1948,13 @@ function DriftCard({
   const [feedbackComment, setFeedbackComment] = useState(initialFeedback?.comment || '');
   const [showCommentForm, setShowCommentForm] = useState(false);
 
-  const overallScore = result.overall_score ?? result.drift_score;
-  const scoreColor = getScoreColor(overallScore);
-  const borderStyle = { borderColor: scoreColor + '33' };
+  const isAligned = result.drift_score <= 40;
+  const isWarning = result.drift_score > 40 && result.drift_score <= 60;
+  const isDanger = result.drift_score > 60;
+
+  const colorClass = isAligned ? 'text-[#138808]' : isWarning ? 'text-[#FF9933]' : 'text-[#D32F2F]';
+  const bgClass = isAligned ? 'bg-[#1388081a]' : isWarning ? 'bg-[#FF99331a]' : 'bg-[#D32F2F1a]';
+  const borderClass = isAligned ? 'border-[#13880833]' : isWarning ? 'border-[#FF993333]' : 'border-[#D32F2F33]';
 
   const exportPDF = async (result: DriftResult) => {
     setIsExporting(true);
@@ -2245,7 +2106,7 @@ function DriftCard({
 
   return (
     <div className="mb-8">
-      <div ref={cardRef} data-report-card className="rounded-2xl border-2 overflow-hidden bg-parchment shadow-lg transition-all hover:shadow-xl" style={borderStyle}>
+      <div ref={cardRef} data-report-card className={cn("rounded-2xl border-2 overflow-hidden bg-parchment shadow-lg transition-all hover:shadow-xl", borderClass)}>
         <div className="p-10 space-y-10 text-sm leading-relaxed font-serif">
           
           {/* Intro Banner */}
