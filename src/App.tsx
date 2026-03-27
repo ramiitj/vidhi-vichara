@@ -152,7 +152,14 @@ function getAlertClassification(result: DriftResult): AlertClassification {
   return 'GREEN';
 }
 
-function getScoreBandLabel(band: ScoreBand): string {
+function getScoreBandLabel(input: ScoreBand | number): string {
+  if (typeof input === 'number') {
+    if (input >= 90) return 'Fully Conforming';
+    if (input >= 75) return 'Substantially Conforming';
+    if (input >= 50) return 'Marginal / Partially Drifting';
+    if (input >= 25) return 'Significantly Drifting';
+    return 'Ultra Vires';
+  }
   const labels: Record<ScoreBand, string> = {
     fully_conforming: 'Fully Conforming',
     substantially_conforming: 'Substantially Conforming',
@@ -160,7 +167,7 @@ function getScoreBandLabel(band: ScoreBand): string {
     significantly_drifting: 'Significantly Drifting',
     ultra_vires: 'Ultra Vires',
   };
-  return labels[band];
+  return labels[input];
 }
 
 function getScoreColor(score: number): string {
@@ -799,9 +806,30 @@ export default function App() {
       content += `[${role}] (${time})\n`;
       content += `${msg.content}\n`;
       if (msg.driftResult) {
+        const dr = msg.driftResult;
+        const score = dr.overall_score ?? dr.drift_score;
         content += `\n[DRIFT ANALYSIS SUMMARY]\n`;
-        content += `Score: ${msg.driftResult.drift_score}\n`;
-        content += `Status: ${msg.driftResult.alignment_status}\n`;
+        content += `Overall Score: ${score}% | Status: ${dr.alignment_status}\n`;
+        if (dr.alert_classification) content += `Alert: ${dr.alert_classification}\n`;
+        if (dr.instrument_profile) {
+          content += `Instrument: ${dr.instrument_profile.title} (${dr.instrument_profile.type})\n`;
+          if (dr.instrument_profile.issuing_authority) content += `Authority: ${dr.instrument_profile.issuing_authority}\n`;
+        }
+        if (dr.parent_act) {
+          content += `Parent Act: ${dr.parent_act.name} (${dr.parent_act.year})\n`;
+        }
+        if (dr.dimensions) {
+          content += `\n7-Dimension Scores:\n`;
+          content += `  D1 Delegation Scope: ${dr.dimensions.d1_delegation_scope?.score}/100\n`;
+          content += `  D2 Substantive Alignment: ${dr.dimensions.d2_substantive_alignment?.score}/100\n`;
+          content += `  D3 Procedural Mandate: ${dr.dimensions.d3_procedural_mandate?.score}/100\n`;
+          content += `  D4 Object & Purpose: ${dr.dimensions.d4_object_purpose?.score}/100\n`;
+          content += `  D5 Non-Contravention: ${dr.dimensions.d5_non_contravention?.score}/100\n`;
+          content += `  D6 Temporal/Territorial: ${dr.dimensions.d6_temporal_territorial?.score}/100\n`;
+          content += `  D7 Reasonableness: ${dr.dimensions.d7_reasonableness?.score}/100\n`;
+        }
+        if (dr.risk_areas?.length) content += `\nRisk Areas: ${dr.risk_areas.join('; ')}\n`;
+        if (dr.suggestions?.length) content += `Suggestions: ${dr.suggestions.join('; ')}\n`;
       }
       content += `------------------------------------\n\n`;
     });
@@ -2197,7 +2225,7 @@ function DriftCard({
 
   const overallScore = result.overall_score ?? result.drift_score;
   const scoreColor = getScoreColor(overallScore);
-  const borderClass = `border-[${scoreColor}33]`;
+  const borderStyle = { borderColor: scoreColor + '33' };
 
   const exportPDF = async (result: DriftResult) => {
     setIsExporting(true);
@@ -2559,7 +2587,7 @@ function DriftCard({
 
   return (
     <div className="mb-8">
-      <div ref={cardRef} data-report-card className={cn("rounded-2xl border-2 overflow-hidden bg-parchment shadow-lg transition-all hover:shadow-xl", borderClass)}>
+      <div ref={cardRef} data-report-card className="rounded-2xl border-2 overflow-hidden bg-parchment shadow-lg transition-all hover:shadow-xl" style={borderStyle}>
         <div className="p-10 space-y-10 text-sm leading-relaxed font-serif">
           
           {/* Intro Banner */}
