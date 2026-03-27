@@ -119,8 +119,8 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
 
           // Chunk the text
           const allChunks = [];
-          const CHUNK_SIZE = 1500;
-          const OVERLAP = 200;
+          const CHUNK_SIZE = 2000;
+          const OVERLAP = 300;
           for (let i = 0; i < fullText.length; i += CHUNK_SIZE - OVERLAP) {
             allChunks.push({
               docName: fileName,
@@ -130,7 +130,7 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
           }
 
           // Generate embeddings for chunks (batching them)
-          const BATCH_SIZE = 100;
+          const BATCH_SIZE = 200;
           for (let i = 0; i < allChunks.length; i += BATCH_SIZE) {
             const batch = allChunks.slice(i, i + BATCH_SIZE);
             const embeddings = await generateEmbeddings(batch.map(c => c.text));
@@ -208,7 +208,7 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeTab === 'knowledgebase' ? 'bg-saffron text-ink font-semibold' : 'hover:bg-parchment-dark text-ink-light'}`}
           >
             <Database className="w-5 h-5" />
-            <TranslatedText text="Knowledgebase (RAG)" />
+            <TranslatedText text="Parent Acts / RAG" />
           </button>
           <button
             onClick={() => setActiveTab('users')}
@@ -266,10 +266,10 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
           {activeTab === 'knowledgebase' && (
             <div>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold font-serif"><TranslatedText text="Legal Knowledgebase" /></h2>
+                <h2 className="text-xl font-semibold font-serif"><TranslatedText text="Parent Legislation Knowledge Base" /></h2>
                 <label className="cursor-pointer bg-saffron text-ink px-4 py-2 rounded-lg font-semibold hover:bg-saffron-hover transition-colors flex items-center gap-2">
                   <Upload className="w-4 h-4" />
-                  {isUploading ? <TranslatedText text="Uploading..." /> : <TranslatedText text="Upload Document" />}
+                  {isUploading ? <TranslatedText text="Uploading..." /> : <TranslatedText text="Upload Parent Act / Legislation" />}
                   <input type="file" className="hidden" onChange={handleUploadKbBatch} accept=".pdf,.txt" multiple disabled={isUploading} />
                 </label>
               </div>
